@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 env:
-  IMAGE_NAME: github-actions
+  # 注意：这里只保留了 ghcr.io 相关的变量
   GHCR_REGISTRY: ghcr.io
 
 jobs:
@@ -20,24 +20,15 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # [New] 1. 设置 QEMU
-      #这是构建 ARM64 镜像的关键，没有它，x86 的 GitHub 服务器无法模拟 ARM 环境
+      # 1. 设置 QEMU (支持 ARM64 的关键)
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
 
-      # [New] 2. 设置 Docker Buildx
-      # Buildx 是 Docker 的扩展工具，支持多架构构建
+      # 2. 设置 Docker Buildx (支持多架构构建)
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
-      # 3. 登录 Docker Hub
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v2
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-
-      # 4. 登录 GHCR
+      # 3. 登录 GHCR (GitHub 自己的镜像仓库)
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v2
         with:
@@ -45,26 +36,26 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # 5. 提取元数据 (Tags)
+      # 4. 提取元数据 (Tags)
       - name: Extract metadata
         id: meta
         uses: docker/metadata-action@v4
         with:
           images: |
-            ${{ secrets.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}
+            # 只保留 GitHub 仓库地址
             ${{ env.GHCR_REGISTRY }}/${{ github.repository }}
           tags: |
             type=raw,value=latest
             type=sha,format=short
             type=ref,event=branch
 
-      # 6. 构建并推送 (已修改支持多架构)
+      # 5. 构建并推送
       - name: Build and push Docker image
         uses: docker/build-push-action@v4
         with:
           context: .
           push: true
-          # [New] 这里指定了同时构建 amd64 和 arm64 两个版本
+          # 同时构建 amd64 (普通电脑) 和 arm64 (甲骨文VPS)
           platforms: linux/amd64,linux/arm64
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
